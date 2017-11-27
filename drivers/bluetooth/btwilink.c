@@ -264,8 +264,8 @@ static int ti_st_send_frame(struct hci_dev *hdev, struct sk_buff *skb)
 	/* Prepend skb with frame type */
 	memcpy(skb_push(skb, 1), &bt_cb(skb)->pkt_type, 1);
 
-	BT_DBG("%s: type %d len %d", hdev->name, bt_cb(skb)->pkt_type,
-			skb->len);
+	// BT_DBG("%s: type %d len %d", hdev->name, bt_cb(skb)->pkt_type,
+	// 		skb->len);
 
 	/* Insert skb to shared transport layer's transmit queue.
 	 * Freeing skb memory is taken care in shared transport layer,
