@@ -18,6 +18,7 @@
 #include <linux/usb/otg.h>
 #include <linux/usb/gadget.h>
 #include <linux/usb/chipidea.h>
+#include <linux/of_gpio.h>
 
 #include "ci.h"
 #include "bits.h"
@@ -51,6 +52,12 @@ void hw_write_otgsc(struct ci_hdrc *ci, u32 mask, u32 data)
 enum ci_role ci_otg_role(struct ci_hdrc *ci)
 {
 	enum ci_role role = hw_read_otgsc(ci, OTGSC_ID)
+		? CI_ROLE_GADGET
+		: CI_ROLE_HOST;
+
+        if (of_machine_is_compatible("fsl,imx6sx-seco-b08")) 
+            if (ci->platdata->dr_mode == USB_DR_MODE_OTG)
+	       role = gpio_get_value(ci->platdata->id_gpio)
 		? CI_ROLE_GADGET
 		: CI_ROLE_HOST;
 
@@ -113,6 +120,15 @@ void ci_handle_id_switch(struct ci_hdrc *ci)
 {
 	enum ci_role role = ci_otg_role(ci);
 	int ret = 0;
+
+	if (of_machine_is_compatible("fsl,imx6sx-seco-b08") && (ci->platdata->dr_mode == USB_DR_MODE_OTG)) {
+		if (role == CI_ROLE_HOST) {
+			regulator_enable(ci->platdata->reg_vbus);
+		} else {
+			if (regulator_is_enabled(ci->platdata->reg_vbus))
+				regulator_disable(ci->platdata->reg_vbus);
+		}
+	}
 
 	if (role != ci->role) {
 		dev_dbg(ci->dev, "switching from %s to %s\n",

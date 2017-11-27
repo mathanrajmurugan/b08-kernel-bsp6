@@ -27,6 +27,7 @@
 #include <linux/of_gpio.h>
 #include <linux/platform_device.h>
 #include <linux/platform_data/usb3503.h>
+#include <linux/regulator/consumer.h>
 #include <linux/regmap.h>
 
 #define USB3503_VIDL		0x00
@@ -62,6 +63,7 @@ struct usb3503 {
 	u8	port_off_mask;
 	int	gpio_intn;
 	int	gpio_reset;
+	int	gpio_clk_en;
 	int	gpio_connect;
 	bool	secondary_ref_clk;
 };
@@ -173,6 +175,7 @@ static int usb3503_probe(struct usb3503 *hub)
 	struct device *dev = hub->dev;
 	struct usb3503_platform_data *pdata = dev_get_platdata(dev);
 	struct device_node *np = dev->of_node;
+	struct regulator *reg_vbus;
 	int err;
 	u32 mode = USB3503_MODE_HUB;
 	const u32 *property;
@@ -249,6 +252,18 @@ static int usb3503_probe(struct usb3503 *hub)
 			}
 		}
 
+		if (of_machine_is_compatible("fsl,imx6sx-seco-b08")) {
+			if ((hub->port_off_mask & 0x1) != 0x1) {
+				reg_vbus = devm_regulator_get(dev, "vbusport3");
+				regulator_enable(reg_vbus);
+			}
+
+			if ((hub->port_off_mask & 0x2) != 0x2) {
+				reg_vbus = devm_regulator_get(dev, "vbusport4");
+				regulator_enable(reg_vbus);
+			}
+		}
+
 		hub->gpio_intn	= of_get_named_gpio(np, "intn-gpios", 0);
 		if (hub->gpio_intn == -EPROBE_DEFER)
 			return -EPROBE_DEFER;
@@ -258,8 +273,34 @@ static int usb3503_probe(struct usb3503 *hub)
 		hub->gpio_reset = of_get_named_gpio(np, "reset-gpios", 0);
 		if (hub->gpio_reset == -EPROBE_DEFER)
 			return -EPROBE_DEFER;
+		hub->gpio_clk_en = of_get_named_gpio(np, "clk-en-gpios", 0);
+		if (hub->gpio_clk_en == -EPROBE_DEFER)
+			return -EPROBE_DEFER;
 		of_property_read_u32(np, "initial-mode", &mode);
 		hub->mode = mode;
+	}
+
+
+	if (gpio_is_valid(hub->gpio_reset)) {
+		err = devm_gpio_request_one(dev, hub->gpio_reset,
+				GPIOF_OUT_INIT_LOW, "usb3503 reset");
+		if (err) {
+			dev_err(dev,
+				"unable to request GPIO %d as reset pin (%d)\n",
+				hub->gpio_reset, err);
+			return err;
+		}
+	}
+
+	if (gpio_is_valid(hub->gpio_clk_en)) {
+		err = devm_gpio_request_one(dev, hub->gpio_clk_en,
+				GPIOF_OUT_INIT_HIGH, "usb3503 clk_en");
+		if (err) {
+			dev_err(dev,
+				"unable to request GPIO %d as clk_en pin (%d)\n",
+				hub->gpio_clk_en, err);
+			return err;
+		}
 	}
 
 	if (hub->port_off_mask && !hub->regmap)
@@ -288,18 +329,6 @@ static int usb3503_probe(struct usb3503 *hub)
 			return err;
 		}
 	}
-
-	if (gpio_is_valid(hub->gpio_reset)) {
-		err = devm_gpio_request_one(dev, hub->gpio_reset,
-				GPIOF_OUT_INIT_LOW, "usb3503 reset");
-		if (err) {
-			dev_err(dev,
-				"unable to request GPIO %d as reset pin (%d)\n",
-				hub->gpio_reset, err);
-			return err;
-		}
-	}
-
 	usb3503_switch_mode(hub, hub->mode);
 
 	dev_info(dev, "%s: probed in %s mode\n", __func__,
@@ -315,8 +344,10 @@ static int usb3503_i2c_probe(struct i2c_client *i2c,
 	int err;
 
 	hub = devm_kzalloc(&i2c->dev, sizeof(struct usb3503), GFP_KERNEL);
-	if (!hub)
+	if (!hub) {
+		dev_err(&i2c->dev, "private data alloc fail\n");
 		return -ENOMEM;
+	}
 
 	i2c_set_clientdata(i2c, hub);
 	hub->regmap = devm_regmap_init_i2c(i2c, &usb3503_regmap_config);
@@ -335,8 +366,10 @@ static int usb3503_platform_probe(struct platform_device *pdev)
 	struct usb3503 *hub;
 
 	hub = devm_kzalloc(&pdev->dev, sizeof(struct usb3503), GFP_KERNEL);
-	if (!hub)
+	if (!hub) {
+		dev_err(&pdev->dev, "private data alloc fail\n");
 		return -ENOMEM;
+	}
 	hub->dev = &pdev->dev;
 
 	return usb3503_probe(hub);
@@ -402,6 +435,7 @@ static struct platform_driver usb3503_platform_driver = {
 	.driver = {
 		.name = USB3503_I2C_NAME,
 		.of_match_table = of_match_ptr(usb3503_of_match),
+		.owner = THIS_MODULE,
 	},
 	.probe		= usb3503_platform_probe,
 };

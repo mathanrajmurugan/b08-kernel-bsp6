@@ -88,6 +88,25 @@ static const char *imx6q_otp_desc[16][8] = {
 	BANK8(CRC0, CRC1, CRC2, CRC3, CRC4, CRC5, CRC6, CRC7),
 };
 
+static const char *imx6sx_otp_desc[16][8] = {
+	BANK8(LOCK, CFG0, CFG1, CFG2, CFG3, CFG4, CFG5, CFG6),
+	BANK8(MEM0, MEM1, MEM2, MEM3, MEM4, ANA0, ANA1, ANA2),
+	BANK8(OTPMK0, OTPMK1, OTPMK2, OTPMK3, OTPMK4, OTPMK5, OTPMK6, OTPMK7),
+	BANK8(SRK0, SRK1, SRK2, SRK3, SRK4, SRK5, SRK6, SRK7),
+	BANK8(RESP0, HSJC_RESP1, MAC0, MAC1, MAC2, HDCP_KSV1, GP1, GP2),
+	BANK8(DTCP_KEY0,  DTCP_KEY1,  DTCP_KEY2,  DTCP_KEY3,  DTCP_KEY4,  MISC_CONF,  FIELD_RETURN, SRK_REVOKE),
+	BANK8(HDCP_KEY0,  HDCP_KEY1,  HDCP_KEY2,  HDCP_KEY3,  HDCP_KEY4,  HDCP_KEY5,  HDCP_KEY6,  HDCP_KEY7),
+	BANK8(HDCP_KEY8,  HDCP_KEY9,  HDCP_KEY10, HDCP_KEY11, HDCP_KEY12, HDCP_KEY13, HDCP_KEY14, HDCP_KEY15),
+	BANK8(HDCP_KEY16, HDCP_KEY17, HDCP_KEY18, HDCP_KEY19, HDCP_KEY20, HDCP_KEY21, HDCP_KEY22, HDCP_KEY23),
+	BANK8(HDCP_KEY24, HDCP_KEY25, HDCP_KEY26, HDCP_KEY27, HDCP_KEY28, HDCP_KEY29, HDCP_KEY30, HDCP_KEY31),
+	BANK8(HDCP_KEY32, HDCP_KEY33, HDCP_KEY34, HDCP_KEY35, HDCP_KEY36, HDCP_KEY37, HDCP_KEY38, HDCP_KEY39),
+	BANK8(HDCP_KEY40, HDCP_KEY41, HDCP_KEY42, HDCP_KEY43, HDCP_KEY44, HDCP_KEY45, HDCP_KEY46, HDCP_KEY47),
+	BANK8(HDCP_KEY48, HDCP_KEY49, HDCP_KEY50, HDCP_KEY51, HDCP_KEY52, HDCP_KEY53, HDCP_KEY54, HDCP_KEY55),
+	BANK8(HDCP_KEY56, HDCP_KEY57, HDCP_KEY58, HDCP_KEY59, HDCP_KEY60, HDCP_KEY61, HDCP_KEY62, HDCP_KEY63),
+	BANK8(HDCP_KEY64, HDCP_KEY65, HDCP_KEY66, HDCP_KEY67, HDCP_KEY68, HDCP_KEY69, HDCP_KEY70, HDCP_KEY71),
+	BANK8(CRC0, CRC1, CRC2, CRC3, CRC4, CRC5, CRC6, CRC7),
+};
+
 static const char *imx6sl_otp_desc[][8] = {
 	BANK8(LOCK, CFG0, CFG1, CFG2, CFG3, CFG4, CFG5, CFG6),
 	BANK8(MEM0, MEM1, MEM2, MEM3, MEM4, ANA0, ANA1, ANA2),
@@ -270,6 +289,13 @@ static void imx7_set_otp_timing(void)
 static struct fsl_otp_devtype_data imx6q_data = {
 	.devtype = FSL_OTP_MX6Q,
 	.bank_desc = (const char **)imx6q_otp_desc,
+	.fuse_nums = 16 * 8,
+	.set_otp_timing = imx6_set_otp_timing,
+};
+
+static struct fsl_otp_devtype_data imx6sx_data = {
+	.devtype = FSL_OTP_MX6SX,
+	.bank_desc = (const char **)imx6sx_otp_desc,
 	.fuse_nums = 16 * 8,
 	.set_otp_timing = imx6_set_otp_timing,
 };
@@ -457,6 +483,7 @@ out:
 static const struct of_device_id fsl_otp_dt_ids[] = {
 	{ .compatible = "fsl,imx6q-ocotp", .data = (void *)&imx6q_data, },
 	{ .compatible = "fsl,imx6sl-ocotp", .data = (void *)&imx6sl_data, },
+	{ .compatible = "fsl,imx6sx-ocotp", .data = (void *)&imx6sx_data, },
 	{ .compatible = "fsl,imx6ul-ocotp", .data = (void *)&imx6ul_data, },
 	{ .compatible = "fsl,imx7d-ocotp", .data = (void *)&imx7d_data, },
 	{ /* sentinel */ }

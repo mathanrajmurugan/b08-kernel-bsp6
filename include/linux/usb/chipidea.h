@@ -12,6 +12,8 @@ struct ci_hdrc_platform_data {
 	const char	*name;
 	/* offset of the capability registers */
 	uintptr_t	 capoffset;
+	int		 id_gpio;
+	int		 id_irq;
 	unsigned	 power_budget;
 	struct phy	*phy;
 	/* old usb_phy interface */

@@ -329,6 +329,12 @@ dtb-$(CONFIG_SOC_IMX6Q) += \
 	imx6q-tx6q-1020-comtft.dtb \
 	imx6q-tx6q-1110.dtb \
 	imx6q-udoo.dtb \
+	imx6sx-seco-b08-basic-rgb7-lvds7.dtb \
+	imx6sx-seco-b08-basic-lvds7.dtb \
+	imx6sx-seco-b08-basic-rgb7.dtb \
+	imx6sx-seco-b08-full-rgb7-lvds7.dtb \
+	imx6sx-seco-b08-full-lvds7.dtb \
+	imx6sx-seco-b08-full-rgb7.dtb \
 	imx6q-seco_quadmo747_928.dtb \
 	imx6q-seco_uq7_962.dtb \
 	imx6q-seco_SBC_A62.dtb \

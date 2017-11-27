@@ -11,6 +11,7 @@
 
 #include <linux/module.h>
 #include <linux/of_platform.h>
+#include <linux/clk.h>
 #include <linux/err.h>
 #include <linux/io.h>
 #include <linux/delay.h>
@@ -156,6 +157,7 @@ struct usbmisc_ops {
 struct imx_usbmisc {
 	void __iomem *base;
 	spinlock_t lock;
+	struct clk *clk;
 	const struct usbmisc_ops *ops;
 };
 
@@ -381,7 +383,7 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
 {
 	struct imx_usbmisc *usbmisc = dev_get_drvdata(data->dev);
 	unsigned long flags;
-	u32 reg;
+	u32 reg, val;
 
 	if (data->index > 3)
 		return -EINVAL;
@@ -399,6 +401,27 @@ static int usbmisc_imx6q_init(struct imx_usbmisc_data *data)
 	writel(reg | MX6_BM_NON_BURST_SETTING,
 			usbmisc->base + data->index * 4);
 
+	/* For HSIC controller */
+	if (data->index == 2 || data->index == 3) {
+		val = readl(usbmisc->base + data->index * 4);
+		writel(val | MX6_BM_UTMI_ON_CLOCK,
+			usbmisc->base + data->index * 4);
+		val = readl(usbmisc->base + MX6_USB_HSIC_CTRL_OFFSET
+			+ (data->index - 2) * 4);
+		val |= MX6_BM_HSIC_EN | MX6_BM_HSIC_CLK_ON;
+		writel(val, usbmisc->base + MX6_USB_HSIC_CTRL_OFFSET
+			+ (data->index - 2) * 4);
+
+		/*
+		 * Need to add delay to wait 24M OSC to be stable,
+		 * It is board specific.
+		 */
+		regmap_read(data->anatop, ANADIG_ANA_MISC0, &val);
+		/* 0 <= data->osc_clkgate_delay <= 7 */
+		if (data->osc_clkgate_delay > ANADIG_ANA_MISC0_CLK_DELAY(val))
+			regmap_write(data->anatop, ANADIG_ANA_MISC0_SET,
+				(data->osc_clkgate_delay) << 26);
+	}
 	spin_unlock_irqrestore(&usbmisc->lock, flags);
 
 	usbmisc_imx6q_set_wakeup(data, false);
@@ -415,9 +438,25 @@ static int usbmisc_imx6sx_init(struct imx_usbmisc_data *data)
 
 	usbmisc_imx6q_init(data);
 
+	/* For HSIC controller */
+	if (of_machine_is_compatible("fsl,imx6sx-seco-b08") || (data->index == 2)) {
+		spin_lock_irqsave(&usbmisc->lock, flags);
+		writel(0x80001842, usbmisc->base + 0x8 + data->index * 4);
+		writel(0x00003800, usbmisc->base + data->index * 4);
+		spin_unlock_irqrestore(&usbmisc->lock, flags);
+
+		usleep_range(1000, 3000);
+
+		spin_lock_irqsave(&usbmisc->lock, flags);
+		writel(0x00003000, usbmisc->base + data->index * 4);
+		spin_unlock_irqrestore(&usbmisc->lock, flags);
+
+		usleep_range(1000, 3000);
+	}
+
+	spin_lock_irqsave(&usbmisc->lock, flags);
 	if (data->index == 0 || data->index == 1) {
 		reg = usbmisc->base + MX6_USB_OTG1_PHY_CTRL + data->index * 4;
-		spin_lock_irqsave(&usbmisc->lock, flags);
 		/* Set vbus wakeup source as bvalid */
 		val = readl(reg);
 		writel(val | MX6SX_USB_VBUS_WAKEUP_SOURCE_BVALID, reg);
@@ -428,33 +467,17 @@ static int usbmisc_imx6sx_init(struct imx_usbmisc_data *data)
 		val = readl(usbmisc->base + data->index * 4);
 		writel(val & ~MX6SX_BM_DPDM_WAKEUP_EN,
 			usbmisc->base + data->index * 4);
-		spin_unlock_irqrestore(&usbmisc->lock, flags);
 	}
 
 	/* For HSIC controller */
 	if (data->index == 2) {
-		spin_lock_irqsave(&usbmisc->lock, flags);
-		val = readl(usbmisc->base + data->index * 4);
-		writel(val | MX6_BM_UTMI_ON_CLOCK,
-			usbmisc->base + data->index * 4);
 		val = readl(usbmisc->base + MX6_USB_HSIC_CTRL_OFFSET
 						+ (data->index - 2) * 4);
-		val |= MX6_BM_HSIC_EN | MX6_BM_HSIC_CLK_ON |
-					MX6SX_BM_HSIC_AUTO_RESUME;
+		val |= MX6SX_BM_HSIC_AUTO_RESUME;
 		writel(val, usbmisc->base + MX6_USB_HSIC_CTRL_OFFSET
 						+ (data->index - 2) * 4);
-		spin_unlock_irqrestore(&usbmisc->lock, flags);
-
-		/*
-		 * Need to add delay to wait 24M OSC to be stable,
-		 * it's board specific.
-		 */
-		regmap_read(data->anatop, ANADIG_ANA_MISC0, &val);
-		/* 0 <= data->osc_clkgate_delay <= 7 */
-		if (data->osc_clkgate_delay > ANADIG_ANA_MISC0_CLK_DELAY(val))
-			regmap_write(data->anatop, ANADIG_ANA_MISC0_SET,
-					(data->osc_clkgate_delay) << 26);
 	}
+	spin_unlock_irqrestore(&usbmisc->lock, flags);
 
 	return 0;
 }
@@ -1140,6 +1163,8 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
 	struct resource	*res;
 	struct imx_usbmisc *data;
 	struct of_device_id *tmp_dev;
+	struct clk *clk;
+	int ret;
 
 	data = devm_kzalloc(&pdev->dev, sizeof(*data), GFP_KERNEL);
 	if (!data)
@@ -1151,6 +1176,20 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
 	data->base = devm_ioremap_resource(&pdev->dev, res);
 	if (IS_ERR(data->base))
 		return PTR_ERR(data->base);
+
+	data->clk = devm_clk_get(&pdev->dev, NULL);
+	if (IS_ERR(data->clk)) {
+		dev_err(&pdev->dev,
+			"failed to get clock, err=%ld\n", PTR_ERR(data->clk));
+		return PTR_ERR(data->clk);
+	}
+
+	ret = clk_prepare_enable(data->clk);
+	if (ret) {
+		dev_err(&pdev->dev,
+			"clk_prepare_enable failed, err=%d\n", ret);
+		return ret;
+	}
 
 	tmp_dev = (struct of_device_id *)
 		of_match_device(usbmisc_imx_dt_ids, &pdev->dev);
@@ -1174,6 +1213,9 @@ static int usbmisc_imx_probe(struct platform_device *pdev)
 
 static int usbmisc_imx_remove(struct platform_device *pdev)
 {
+	struct imx_usbmisc *usbmisc;
+	usbmisc = dev_get_drvdata(pdev);
+	clk_disable_unprepare(usbmisc->clk);
 	return 0;
 }
 
