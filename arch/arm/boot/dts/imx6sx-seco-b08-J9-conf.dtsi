@@ -1,0 +1,94 @@
+#include "imx6sx-seco-b08-expansion-J9.dtsi"
+
+
+
+
+&pwm1 {
+	status = "okay";
+};
+
+
+
+
+&ecspi5 {
+	status = "okay";
+};
+
+
+
+
+&flexcan1 {
+	status = "okay";
+};
+
+
+
+
+&uart6 {
+	fsl,rs485-mode;
+	rs485-cts-gpio = <&gpio1 20 0>;
+	status = "okay";
+};
+
+
+
+
+&spdif {
+	status = "okay";
+};
+
+
+
+
+&i2c2 {
+	status = "okay";
+};
+
+
+
+
+&uart1 {
+	pinctrl-0	= <&pinctrl_j9_port11_2>;
+	status		= "okay";
+};
+
+
+
+
+&uart2 {
+	pinctrl-0	= <&pinctrl_j9_port11_3>;
+	status		= "okay";
+};
+
+
+
+
+&pwm2 {
+	status = "okay";
+};
+
+
+
+
+&pwm5 {
+	status = "okay";
+};
+
+
+
+
+&iomuxc {
+
+pinctrl-0 = <&pinctrl_hog
+
+&pinctrl_j9_port5_gpio
+
+&pinctrl_j9_port7_gpio
+
+&pinctrl_j9_port8_gpio
+
+&pinctrl_j9_port9_gpio
+
+>;
+};
+

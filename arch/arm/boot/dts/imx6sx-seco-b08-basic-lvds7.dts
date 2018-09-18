@@ -10,7 +10,9 @@
 
 /dts-v1/;
 
-#include "imx6sx-seco-b08-lvds7.dtsi" 
+#include "imx6sx-seco-b08-lvds7.dtsi"
+#include "imx6sx-seco-b08-expansion-J9.dtsi" 
+#include "imx6sx-seco-b08-J9-conf.dtsi"
 
 / {
         model = "SECO B08 BASIC (based on iMX.6 SoloX) LVDS 7'' Display";
